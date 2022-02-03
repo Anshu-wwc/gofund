@@ -450,14 +450,14 @@ function wwc_view_shortcode_callback( $atts ){
     $content .= '<div class="wwc-wrapper">';
     foreach( $entries as $entry ){
         $entry_fields = json_decode( $entry->fields, true );
-            // echo "<pre>".print_r( $entries , 1 )."</pre>";
+            // echo "<pre>".print_r( $entry_fields , 1 )."</pre>";
         $goal_amount = $entry_fields[26]['value'];
             $content .= '
                 <div class="wwc-post-section">
                     <div class="wwc-row">
                         <div class="col">
                             <div class="wwc-company-logo">';
-                            $content .='<a href="/fundraiser-update-form/?user_id='.$entries_args['user_id'].'&edit=true" style="background-color: #a133f6;
+                            $content .='<a href="/fundraiser-update-form/?user_id='.$entries_args['user_id'].'&edit=true" style="background-color: #2b539c;
     color: rgba(0,0,0,.6);padding:10px;border-radius: 25px;color:white;font-weight:bold">Edit Entry</a>';
 
 
@@ -473,8 +473,8 @@ function wwc_view_shortcode_callback( $atts ){
                         </div>
                         <div class="col">
                             <div class="wwc-page-title" style="font-size:50px;">';
-                                if( !empty($entry_fields[24]['value'] ) ){
-                                    $content .='<h2>'.$entry_fields[24]['value'].'</h2>';
+                                if( !empty($entry_fields[18]['value'] ) ){
+                                    $content .='<h2>'.$entry_fields[18]['value'].'</h2>';
                                 }
                             $content .='</div>
                         </div>
@@ -484,13 +484,17 @@ function wwc_view_shortcode_callback( $atts ){
                                 if( !empty($entry_fields[3]['value'] ) ){
                                     $content .='<h2>'.$entry_fields[3]['value'].'</h2>';
                                 }
-                            $content .='</div>
-                            <div class="fund-gauge">
-                                <img src="https://www.movementfund.com/wp-content/uploads/2021/12/fund-gauge.png">
-                                <a style"text-align:center" class="et_pb_button et_pb_more_button et_pb_button_one" href="/donate/">DONATE HERE</a><br>
-                                <a style"text-align:center" class="et_pb_button et_pb_more_button et_pb_button_one" href="/donate/">SHARE</a>
-                            </div>
+                            $content .='</div>';
+                            $content.='<div class="sf-progress-bar">';
+                                // Fixed the ultimeter going out of the page
+                                $ultimeter = do_shortcode('[ultimeter id="50231"]'); 
+                                $content .= $ultimeter;
+                                $content.='</div> 
+                                <div class="wwc-buttons">
 
+                                    <a style"text-align:center" class="share-button-cf" href="'.$affiliate_url.'">SHARE</a>                                
+                                    <a style"text-align:center" class="share-button-cf" href="/donate/">Donate Now</a><br>
+                                </div>
                         </div>
                     </div>
 
@@ -552,6 +556,42 @@ function wwc_view_shortcode_callback( $atts ){
 add_action( 'wpforms_process_complete','wwc_affiliate_register_user', 10, 4 );
 
 function wwc_affiliate_register_user( $fields, $entry, $form_data, $entry_id ){
+
+    // if user is logged in then update data
+    if( is_user_logged_in() && absint( $form_data['id'] ) == 50414 ){
+
+        /**
+         * Get the entries of update form
+         */
+
+        $user_id = $_GET['user_id'];
+        $entry = wpforms()->entry->get( $entry_id );
+ 
+        // Fields are in JSON, so we decode to an array
+        $entry_fields = $entry->fields;
+
+        // get target form
+        $entries_args = [
+            'form_id' => absint(49926),
+            'user_id' => $user_id
+        ];
+
+        // Get the last entry id 
+        $entries = wpforms()->entry->get_entries( $entries_args );
+
+        // get the last entry id
+        $last_array = end($entries);
+        $target_entry_id = $last_array->entry_id;
+
+        // update target entry
+        wpforms()->entry->update( $target_entry_id, array( 'fields' => $entry_fields,'user_id' => $user_id ), '', '', array( 'cap' => false ) );
+
+        // delete current entry
+        wpforms()->entry->delete( $entry_id, [ 'cap' => false ] );
+
+
+    }
+
     if(  absint( $form_data['id'] ) == 49926 ) {
         $entry = wpforms()->entry->get( $entry_id );
  
@@ -572,7 +612,7 @@ function wwc_affiliate_register_user( $fields, $entry, $form_data, $entry_id ){
                 'user_login'        => sanitize_user( $user_name ),
                 'user_pass'         => $password,
                 'user_email'        => sanitize_text_field( $user_email ),
-                'first_name'        => $first_name,
+                'first_name'        => $user_name,
                 'last_name'         => '',
                 'user_registered'   => date('Y-m-d H:i:s'),
                 'role'              => 'subscriber'
@@ -629,35 +669,339 @@ function wwc_affiliate_register_user( $fields, $entry, $form_data, $entry_id ){
     
 }
 
-// function wpf_dev_process( $fields, $entry, $form_data ) {
-      
-//     // Optional, you can limit to specific forms. Below, we restrict output to
-//     // form #5.
-//     if ( absint( $form_data['id'] ) == 49926  ) {
-       
-//     $user_name = $entry_fields[11]['value'];
-//     $user_email = $entry_fields[7]['value'];
-    
-//     $exists = email_exists( $user_email );
-//     if ( $exists ) {
-//         // Add to global errors. This will stop form entry from being saved to the database.
-//         // Uncomment the line below if you need to display the error above the form.
-//         // wpforms()->process->errors[ $form_data['id'] ]['header'] = esc_html__( 'Some error occurred.', 'plugin-domain' );    
 
-//         // Check the field ID 4 and show error message at the top of form and under the specific field
-//         wpforms()->process->errors[ $form_data['id'] ] [ '7' ] = esc_html__( 'This email is already registered, Please use other email.', 'affiliate' );
-  
-//         // Add additional logic (what to do if error is not displayed)
-//         }
-//     }
+add_action('wp_footer','wwc_add_fundraiser_scripts');
+function wwc_add_fundraiser_scripts(){
 
-//     if ( username_exists( $user_name ) ) {
+    if( !empty( $_GET )){
 
-//         wpforms()->process->errors[ $form_data['id'] ] [ '11' ] = esc_html__( 'This username exists, Please use other username.', 'affiliate' );
+        $user_id = $_GET['user_id'];
+        $edit = $_GET['edit'];
+
+        if( $edit == 'true'){
+
+            $atts = array(
+                'id'     => '49926',
+                'user'   => $user_id,
+            );
+
+
+            // Get form entries
+            if ( empty( $atts['id'] ) || ! function_exists( 'wpforms' ) ) {
+                return;
+            }
+
+            // Get the form, from the ID provided in the shortcode.
+            $form = wpforms()->form->get( absint( $atts['id'] ) );
+
+            // If the form doesn't exists, abort.
+            if ( empty( $form ) ) {
+                return;
+            }
+
+
+            $form_data = ! empty( $form->post_content ) ? wpforms_decode( $form->post_content ) : '';
+            // echo "<pre>".print_r( $form_data, 1 )."</pre>";
+
+            // Setup the form fields.
+            if ( empty( $form_field_ids ) ) {
+                $form_fields = $form_data['fields'];
+            } else {
+                $form_fields = [];
+                foreach ( $form_field_ids as $field_id ) {
+                    if ( isset( $form_data['fields'][ $field_id ] ) ) {
+                        $form_fields[ $field_id ] = $form_data['fields'][ $field_id ];
+                    }
+                }
+            }
+
+            // Here we define what the types of form fields we do NOT want to include,
+            // instead they should be ignored entirely.
+            $form_fields_disallow = apply_filters( 'wpforms_frontend_entries_table_disallow', [ 'divider', 'html', 'pagebreak', 'captcha' ] );
+
+            // Loop through all form fields and remove any field types not allowed.
+            foreach ( $form_fields as $field_id => $form_field ) {
+                if ( in_array( $form_field['type'], $form_fields_disallow, true ) ) {
+                    unset( $form_fields[ $field_id ] );
+                }
+            }
+
+            $entries_args = [
+                'form_id' => absint( $atts['id'] ),
+                'number'    => '1',
+                'order_by' =>'entry_id',
+                'order'     => 'DESC'
+            ];
+
+            // Narrow entries by user if user_id shortcode attribute was used.
+            $entries_args['user_id'] = $_GET['user_id'];
+
+            // Get all entries for the form, according to arguments defined.
+            // There are many options available to query entries. To see more, check out
+            // the get_entries() function inside class-entry.php (https://a.cl.ly/bLuGnkGx).
+            $entries = wpforms()->entry->get_entries( $entries_args );
+
+            //start custom fundraiser page wrapper. This design is supposed to have the look of gofundme
+            foreach( $entries as $entry ){
+                $entry_fields = json_decode( $entry->fields, true );
+                
+                // echo "<pre>".print_r($entry_fields, 1)."</pre>";
+                // Get the values from the entry
+                $username               = $entry_fields[11]['value'];
+                $org_address_1          = $entry_fields[12]['address1'];
+                $org_address_city       = $entry_fields[12]['city'];
+                $org_address_state      = $entry_fields[12]['state'];
+                $goal_amount            = $entry_fields[13]['value'];
+                $fund_rec_org_name      = $entry_fields[16]['value'];
+                $fund_rec_org_address1  = $entry_fields[17]['address1'];
+                $fund_rec_org_city      = $entry_fields[17]['city'];
+                $fund_rec_org_state     = $entry_fields[17]['state'];
+
+                $campaign_title         = $entry_fields[18]['value'];
+                $campaign_description   = $entry_fields[19]['value'];
+                $funding_category       = $entry_fields[20]['value'];
+
+                $email    = $entry_fields[7]['value'];
+                $company_name    = $entry_fields[2]['value'];
+                $slogan    = $entry_fields[3]['value'];
+                $company_interest    = $entry_fields[5]['value'];
+                $company_description    = $entry_fields[6]['value'];
+                // Now populate the fields of the form
+                $hidden = $entry_fields[12]['value'];
+
+                $commission = $entry_fields[21]['value'];
+                $partner_commission = $entry_fields[22]['value'];
+                ?>
+
+                <script>
+                    
+                    jQuery(document).ready( function(){
+
+                        // jQuery('input[name="wpforms[fields][8][primary]"]').hide();
+                        // jQuery('#wpforms-49926-field_8-container').hide();
+                        // jQuery('input[name="wpforms[fields][8][secondary]"]').hide();
+                        jQuery('#wpforms-49926-field_10').hide();
+
+                        
+                        var username = '<?php echo $username; ?>';
+                        var org_address_1 = '<?php echo $org_address_1; ?>';
+                        var org_address_city = '<?php echo $org_address_city; ?>';
+                        var org_address_state = '<?php echo $org_address_state; ?>';
+                        var goal_amount = '<?php echo $goal_amount; ?>';
+                        var fund_rec_org_name = '<?php echo $fund_rec_org_name; ?>';
+                        var fund_rec_org_address1 = '<?php echo $fund_rec_org_address1; ?>';
+                        var fund_rec_org_city = '<?php echo $fund_rec_org_city; ?>';
+                        var fund_rec_org_state = '<?php echo $fund_rec_org_state; ?>';
+                        var campaign_title = '<?php echo $campaign_title; ?>';
+                        var campaign_description = '<?php echo $campaign_description; ?>';
+
+                        var email = '<?php echo $email; ?>';
+                        var company_name = '<?php echo $company_name; ?>';
+                        var slogan = '<?php echo $slogan; ?>';
+                        var company_interest = '<?php echo $company_interest; ?>';
+                        var company_description = '<?php echo $company_description; ?>';
+                        var funding_category    = '<?php echo $funding_category; ?>';
+
+                         var commission    = '<?php echo $commission; ?>';
+
+                         var partner_commission    = '<?php echo $partner_commission; ?>';
+
+
+                        jQuery('input[name="wpforms[fields][11]"]').val(username);
+                        jQuery('input[name="wpforms[fields][12][address1]"]').val(org_address_1);
+                        jQuery('input[name="wpforms[fields][12][city]"]').val(org_address_city);
+                        jQuery('select[name="wpforms[fields][12][state]"] option[value="'+org_address_state+'"]').attr('selected','selected');
+                        jQuery('input[name="wpforms[fields][13]"]').val(goal_amount);
+                        jQuery('input[name="wpforms[fields][16]"]').val(fund_rec_org_name);
+                        jQuery('input[name="wpforms[fields][17][address1]"]').val(fund_rec_org_address1);
+                        jQuery('input[name="wpforms[fields][17][city]"]').val(fund_rec_org_city);
+                        jQuery('select[name="wpforms[fields][17][state]"] option[value="'+fund_rec_org_state+'"]').attr('selected','selected');
+                        jQuery('input[name="wpforms[fields][18]"]').val(campaign_title);
+                        jQuery('textarea[name="wpforms[fields][19]"]').val(campaign_description);
+
+                        jQuery('input[name="wpforms[fields][21]"]').val(commission);
+
+                        jQuery('input[name="wpforms[fields][22]"]').val(partner_commission);
+
+                        jQuery('input[name="wpforms[fields][11]"]').attr('disabled','disabled');
+
+                        jQuery('select[name="wpforms[fields][20]"] option[value="'+funding_category+'"]').attr('selected','selected');
+
+
+
+                        jQuery('input[name="wpforms[fields][7]"]').val(email);
+
+                        jQuery('input[name="wpforms[fields][7]"]').attr('disabled','disabled');
+
+                        jQuery('input[name="wpforms[fields][2]"]').val(company_name);
+                        jQuery('input[name="wpforms[fields][3]"]').val(slogan);
+                        jQuery('textarea[name="wpforms[fields][5]"]').val(company_interest);
+                        jQuery('textarea[name="wpforms[fields][6]"]').val(company_description);
+
+                        
+
+                    })
+
+
+
+
+                </script>
+                <?php
+            }
+        }
+    }
+ 
+}
+
+
+// Render Ultimeter progressbar
+add_action('wp_footer','wwc_render_progress_bar');
+function wwc_render_progress_bar(){
+
+    $user_id = $_GET['user_id'];
+
+
+    $atts = array(
+        'id'     => '49926',
+        'user'   => $user_id,
+    );
+
+
+    // Get form entries
+    if ( empty( $atts['id'] ) || ! function_exists( 'wpforms' ) ) {
+        return;
+    }
+
+    // Get the form, from the ID provided in the shortcode.
+    $form = wpforms()->form->get( absint( $atts['id'] ) );
+
+    // If the form doesn't exists, abort.
+    if ( empty( $form ) ) {
+        return;
+    }
+
+
+    $form_data = ! empty( $form->post_content ) ? wpforms_decode( $form->post_content ) : '';
+    // echo "<pre>".print_r( $form_data, 1 )."</pre>";
+
+    // Setup the form fields.
+    if ( empty( $form_field_ids ) ) {
+        $form_fields = $form_data['fields'];
+    } else {
+        $form_fields = [];
+        foreach ( $form_field_ids as $field_id ) {
+            if ( isset( $form_data['fields'][ $field_id ] ) ) {
+                $form_fields[ $field_id ] = $form_data['fields'][ $field_id ];
+            }
+        }
+    }
+
+    // Here we define what the types of form fields we do NOT want to include,
+    // instead they should be ignored entirely.
+    $form_fields_disallow = apply_filters( 'wpforms_frontend_entries_table_disallow', [ 'divider', 'html', 'pagebreak', 'captcha' ] );
+
+    // Loop through all form fields and remove any field types not allowed.
+    foreach ( $form_fields as $field_id => $form_field ) {
+        if ( in_array( $form_field['type'], $form_fields_disallow, true ) ) {
+            unset( $form_fields[ $field_id ] );
+        }
+    }
+
+    $entries_args = [
+        'form_id' => absint( $atts['id'] ),
+        'number'    => '1',
+        'order_by' =>'entry_id',
+        'order'     => 'DESC'
+    ];
+
+    $user_id = $_GET['user_id'];
+    // Narrow entries by user if user_id shortcode attribute was used.
+    $entries_args['user_id'] = $_GET['user_id'];
+
+    // Get all entries for the form, according to arguments defined.
+    // There are many options available to query entries. To see more, check out
+    // the get_entries() function inside class-entry.php (https://a.cl.ly/bLuGnkGx).
+    $entries = wpforms()->entry->get_entries( $entries_args );
+
+    $affiliate_id = affwp_get_affiliate_id( $user_id );
+    $earnings = affwp_get_affiliate_earnings( $affiliate_id );
+
+    //start custom fundraiser page wrapper. This design is supposed to have the look of gofundme
+    foreach( $entries as $entry ){
+        $entry_fields = json_decode( $entry->fields, true );
         
-//     }
-// }
-// add_action( 'wpforms_process', 'wpf_dev_process', 10, 3 );
+        // echo "<pre>".print_r($entry_fields, 1)."</pre>";
+        // Get the values from the entry
+       
+        $goal_amount            = $entry_fields[13]['value'];
+
+        $ultimeter_post = get_post(50231);
+        $ul_goal_amount = get_post_meta(50231,'_ultimeter_goal_amount',true );
+
+        ?>
+        <script>
+            $(document).ready( function(){
+
+                // render Progress on ultimeter
+
+                var progress_goal = '<?php echo $earnings; ?>'; 
+                
+                var goal_by_user = '<?php echo $goal_amount; ?>';
+                // var goal_by_user = 30;
+
+
+                var progress_percent = (goal_by_user/progress_goal)*100;
+          
+                $('#post-50231 .ultimeter_meter_goal .ultimeter_meter_amount').html('$'+goal_by_user);
+                $('#post-50231 .ultimeter_meter_progress .ultimeter_meter_amount').html('$'+progress_goal);
+
+                $('#post-50231 .ultimeter_meter .ultimeter_meter_outer .ultimeter_progressbar_progress').css('width',progress_percent+' !important');
+
+            })
+
+
+
+        </script>
+
+        <?php
+    }
+}
+/*
+ * Remove all user entries before saving the entry - this is for all forms.
+ * Always get the latest entries of the users
+ * @link https://wpforms.com/developers/how-to-overwrite-entries-from-users-who-have-already-submitted-a-form/
+ *
+ */
+ 
+function remove_all_before_entry_save( $fields, $entry, $form_id ) {
+ 
+        //get the current user's user ID
+    $user_id = get_current_user_id();
+ 
+        //check if the user is logged in, if not logged in skip this code snippet all together
+    if ( empty( $user_id ) ) {
+        return;
+    }
+ 
+        //perform a query for any entries submitted on this form by this user ID
+    $entries = wpforms()->entry->get_entries(
+        [
+            'form_id' => 49926,
+            'user_id' => $user_id,
+            'number'  => -1,
+            'select'  => 'entry_ids',
+            'cap'     => false,
+        ]
+    );
+ 
+        //for any previous entries this user has submitted on this form, remove them and replace them with this entry only 
+    foreach ( $entries as $_entry ) {
+        wpforms()->entry->delete( $_entry->entry_id, [ 'cap' => false ] );
+    }
+}
+add_action( 'wpforms_process_entry_save', 'remove_all_before_entry_save', 9, 3 );
+
+
 /**
  * Ends
  */
